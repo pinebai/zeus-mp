@@ -1,0 +1,109 @@
+c=======================================================================
+c
+c    \\\\\\\\\\      B E G I N   S U B R O U T I N E      //////////
+c    //////////                  COOLING                  \\\\\\\\\\
+c
+c                            Developed by
+c                            Prateek Sharma 
+c
+c=======================================================================
+c
+       subroutine cooling 
+c
+c Implements f-f (+metals) cooling; assuming that CGS units are used
+c Density cannot simply be scaled out like in case when there is no cooling
+c or self gravity. Tozzi & Norman 2001 cooling function; see Chandran 2007, 
+c Guo & Peng Oh 2007
+c
+c......................................................................
+      use real_prec
+      use config
+      use param
+      use root
+      use grid
+      use field
+#ifdef MPI_USED
+      use mpiyes
+#else
+      use mpino
+#endif
+      use mpipar
+      use metallicity 
+      use cons
+      use bndry
+c
+      implicit NONE
+c
+      integer  :: i, j, k, l
+      real(rl) :: mui, n_e, n_i, TkeV 
+      real(rl) :: cooling_rate, dtcool
+      integer :: ncool
+c
+      mui = 1.0d0/(1.0d0/mu - 1.0d0/mue) 
+
+      dtcool = huge
+      do k=ks, ke
+      do j=js, je
+      do i=is, ie
+        n_e = d(i,j,k)/(mp*mue)
+        n_i = d(i,j,k)/(mp*mui)
+        TkeV = gamm1*e(i,j,k)/((n_e+n_i)*1.6022d-9)
+        dtcool =min(0.25*e(i,j,k)/(1.0d-22*n_i*n_e*( 8.6d-3*TkeV**(-1.7)
+     &  + 5.8d-2*TkeV**0.5 + 6.3d-2)), dtcool)
+c not using a dt limit on cooling. need to be careful about it if running in 
+c problems
+c        e(i,j,k) = e(i,j,k) - cooling_rate*dt
+
+c        TkeV = gamm1*e(i,j,k)/((n_e+n_i)*1.6022d-9)
+c setting temperature floor of 0.03 keV, where cooling function is invalid
+c        if (TkeV.lt.0.03) then
+c          e(i,j,k) = 0.03*1.6022d-9*(n_e+n_i)/gamm1
+c          write(330,*) 'nhy, time, dt, cooling_rate, e(i,j,k) = ', 
+c     &    nhy, time, dt, cooling_rate, e(i,j,k)
+c        endif  
+      enddo
+      enddo
+      enddo
+c
+      ncool = int(dt/dtcool) + 1
+      dtcool = dt/float(ncool)
+
+      do l=1, ncool
+
+      do k=ks, ke
+      do j=js, je
+      do i=is, ie
+        n_e = d(i,j,k)/(mp*mue)
+        n_i = d(i,j,k)/(mp*mui)
+        TkeV = gamm1*e(i,j,k)/((n_e+n_i)*1.6022d-9)
+        cooling_rate = 1.0d-22*n_i*n_e*( 8.6d-3*TkeV**(-1.7)
+     &  + 5.8d-2*TkeV**0.5 + 6.3d-2)
+        e(i,j,k) = e(i,j,k) - cooling_rate*dtcool
+        TkeV = gamm1*e(i,j,k)/((n_e+n_i)*1.6022d-9)
+        if (TkeV.lt.0.03) then
+          e(i,j,k) = 0.03*1.6022d-9*(n_e+n_i)/gamm1
+        endif 
+      enddo
+      enddo
+      enddo 
+
+
+#ifdef MPI_USED
+      if (coords(1).eq.ntiles(1)-1) then
+#endif
+c        e(ie,:,:) = 0.3711333E-10
+        e(ie,:,:) = 4.506321e-10 
+#ifdef MPI_USED
+      endif
+#endif
+
+      enddo
+c
+c making the boundary values out of date
+c
+      do i = 1,6
+       bvstat(i,2) = 0      !  e
+      enddo
+c
+      return
+       end

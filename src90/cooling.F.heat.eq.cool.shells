@@ -1,0 +1,184 @@
+c=======================================================================
+c
+c    \\\\\\\\\\      B E G I N   S U B R O U T I N E      //////////
+c    //////////                  COOLING                  \\\\\\\\\\
+c
+c                            Developed by
+c                            Prateek Sharma 
+c
+c=======================================================================
+c
+       subroutine cooling 
+c
+c Implements f-f (+metals) cooling; assuming that CGS units are used
+c Density cannot simply be scaled out like in case when there is no cooling
+c or self gravity. Tozzi & Norman 2001 cooling function; see Chandran 2007, 
+c Guo & Peng Oh 2007
+c
+c......................................................................
+      use real_prec
+      use config
+      use param
+      use root
+      use grid
+      use field
+#ifdef MPI_USED
+      use mpiyes
+#else
+      use mpino
+#endif
+      use mpipar
+      use metallicity 
+      use cons
+      use bndry
+c
+      implicit NONE
+c
+      integer  :: i, j, k, n, nsubcycle
+      real(rl) :: mui, n_e, n_i, TkeV
+      real(rl) :: cooling_rate(in,jn,kn)
+      real(rl) :: dvol, dtcool
+      real(rl) :: const_heat(in), vol(in)  
+      real(rl) :: buf_in_dummy(2*in), buf_out_dummy(2*in)
+c
+      mui = 1.0d0/(1.0d0/mu - 1.0d0/mue)
+
+      dtcool = huge
+
+      do k=ks, ke
+      do j=js, je
+      do i=is, ie
+        n_e = d(i,j,k)*mui/(mp*mue)
+        n_i = d(i,j,k)/mp
+        TkeV = gamm1*e(i,j,k)/((n_e+n_i)*1.6022d-9)
+c
+c        if (TkeV.gt.0.02) then
+c          cooling_rate(i,j,k) = 1.0d-22*n_i*n_e*( 8.6d-3*TkeV**(-1.7)
+c     &    + 5.8d-2*TkeV**0.5 + 6.3d-2)
+c        else if (TkeV.le.0.02.and.TkeV.ge.0.0017235) then
+c          cooling_rate(i,j,k) = n_i*n_e*6.72e-22*(TkeV/0.02)**0.6 
+c        else 
+c          cooling_rate(i,j,k) = n_i*n_e*1.544e-22*(TkeV/0.0017235)**6.0
+c        endif 
+c
+      if (TkeV.gt.0.17235) then
+          cooling_rate(i,j,k) = 1.0d-22*n_i*n_e*( 8.6d-3*TkeV**(-1.7)
+     &    + 5.8d-2*TkeV**0.5 + 6.3d-2)
+      else
+          cooling_rate(i,j,k) = n_i*n_e*2.579e-23*(TkeV/0.17235)**6.0
+      endif
+c
+        if (TkeV.le.1.0d-4) cooling_rate(i,j,k) = 0.0d0
+c
+        dtcool = min( dtcool, e(i,j,k)/cooling_rate(i,j,k) )
+c
+      enddo
+      enddo
+      enddo
+c
+#ifdef MPI_USED
+      buf_in(1) = dtcool
+      call MPI_ALLREDUCE( buf_in(1), buf_out(1), 1
+     &                      , MPI_2DOUBLE_PRECISION
+     &                      , MPI_MINLOC, comm3d, ierr)
+      dtcool  =   buf_out(1) 
+#endif
+c
+c factor of 4.0 chosen arbitrarily
+c
+c      nsubcycle = int(4.0*dt/dtcool) + 1
+      nsubcycle = int(10.0*dt/dtcool) + 1
+      dtcool = dt/nsubcycle
+c
+      if (mod(nhy,100).eq.0) write(17,*) nsubcycle
+c
+      do n = 1, nsubcycle
+c
+c implementing a constant in shell heating, s.t. cooling = heating over the shell
+c
+      do i = is, ie 
+      vol(i) = 0.0d0
+      const_heat(i) = 0.0d0
+      do k = ks, ke
+      do j = js, je
+
+        dvol = dvl1a(i)*dvl2a(j)*dvl3a(k)
+        vol(i) = vol(i) + dvol
+
+        n_e = d(i,j,k)*mui/(mp*mue)
+        n_i = d(i,j,k)/mp
+        TkeV = gamm1*e(i,j,k)/((n_e+n_i)*1.6022d-9)
+c
+c        if (TkeV.gt.0.02) then
+c          cooling_rate(i,j,k) = 1.0d-22*n_i*n_e*( 8.6d-3*TkeV**(-1.7)
+c     &    + 5.8d-2*TkeV**0.5 + 6.3d-2)
+c        else if (TkeV.le.0.02.and.TkeV.ge.0.0017235) then
+c          cooling_rate(i,j,k) = n_i*n_e*6.72e-22*(TkeV/0.02)**0.6
+c        else
+c          cooling_rate(i,j,k) = n_i*n_e*1.544e-22*(TkeV/0.0017235)**6.0
+c        endif
+
+        if (TkeV.gt.0.17235) then 
+          cooling_rate(i,j,k) = 1.0d-22*n_i*n_e*( 8.6d-3*TkeV**(-1.7)
+     &    + 5.8d-2*TkeV**0.5 + 6.3d-2)
+        else
+          cooling_rate(i,j,k) = n_i*n_e*2.579e-23*(TkeV/0.17235)**6.0
+        endif
+
+        if (TkeV.le.1.0d-4) cooling_rate(i,j,k) = 0.0d0
+
+        const_heat(i) = const_heat(i) + dvol*cooling_rate(i,j,k)
+
+      enddo
+      enddo
+      enddo
+
+#ifdef MPI_USED
+      buf_in_dummy(1:ie-is+1) = const_heat(is:ie)
+      buf_in_dummy(ie-is+2:2*(ie-is)+2) = vol(is:ie)
+      call MPI_ALLREDUCE( buf_in_dummy, buf_out_dummy, 2*(ie-is+1)
+     &                   , MPI_FLOAT
+     &                   , MPI_SUM, comm2d, ierr)
+      const_heat(is:ie) = buf_out_dummy(1:ie-is+1)
+      vol(is:ie) = buf_out_dummy(ie-is+2:2*(ie-is)+2) 
+#endif
+
+      do i = is, ie
+        const_heat(i) = const_heat(i)/vol(i)
+      enddo
+
+      do k = ks, ke
+      do j = js, je
+      do i = is, ie
+
+
+        cooling_rate(i,j,k) = cooling_rate(i,j,k) - const_heat(i)
+        e(i,j,k) = e(i,j,k) - dtcool*cooling_rate(i,j,k)
+c
+c cooling done implicitly
+c
+c        e(i,j,k) = e(i,j,k)/( 1.0+dtcool*cooling_rate(i,j,k)/e(i,j,k) )
+
+      enddo 
+      enddo
+      enddo
+c
+#ifdef MPI_USED
+      if (coords(1).eq.ntiles(1)-1) then
+#endif
+        e(ie,:,:) = 0.3711333E-10
+c        e(ie,:,:) = 4.506321e-10
+#ifdef MPI_USED
+      endif
+#endif
+
+      enddo
+c
+c making the boundary values out of date
+c
+      do i = 1,6
+       bvstat(i,2) = 0      !  e
+      enddo
+c
+      return
+      end

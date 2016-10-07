@@ -1,0 +1,184 @@
+c=======================================================================
+c
+c    \\\\\\\\\\      B E G I N   S U B R O U T I N E      //////////
+c    //////////              THERMAL                      \\\\\\\\\c
+c=======================================================================
+c
+      subroutine thermal
+c
+c-----------------------------------------------------------------------
+c
+      use real_prec
+      use config
+      use param
+      use field
+      use grid
+      use cons
+      use metallicity
+      use root
+      use domain
+#ifdef MPI_USED
+      use mpiyes
+#else
+      use mpino
+#endif
+      use mpipar
+c
+      implicit none
+c
+      integer  :: i, j, k, l, iseed
+      real*8 :: amp, rvalue, rv, pcrbyp, TkeV
+      real*8 :: mui, x, y, z, n_e, ptot, T
+      real*8 :: kmin, wn, theta, phi, rphase, phase
+      real*8 :: a3(in,jn,kn)
+      real*8 :: gasdev, randgs, drho(in,jn,kn)
+      character*9 :: inifile
+      integer :: nk
+      namelist  /pgen/ x, y, z, amp, pcrbyp, n_e, TkeV
+c
+c-----------------------------------------------------------------------
+c
+      n_e = 0.1
+      TkeV = 1.0
+      pcrbyp = 0.001
+      x = 0.7
+      y = 0.28
+      z = 0.02
+      amp = 0.01
+      if (myid.eq.0) then
+        read(1,pgen)
+        write(2,pgen)
+#ifdef MPI_USED
+        buf_in(1) = x
+        buf_in(2) = y
+        buf_in(3) = z
+        buf_in(4) = amp
+        buf_in(5) = pcrbyp
+        buf_in(6) = n_e
+        buf_in(7) = TkeV
+      endif
+        call MPI_BCAST( buf_in, 7, MPI_DOUBLE_PRECISION
+     &                , 0, comm3d, ierr )
+      if (myid.ne.0) then
+        x = buf_in(1)
+        y = buf_in(2)
+        z = buf_in(3)
+        amp = buf_in(4)
+        pcrbyp = buf_in(5)
+        n_e = buf_in(6)
+        TkeV = buf_in(7)
+#endif
+      endif
+      mu = 1.0d0/(2.0*x+0.75*y+0.5625*z)
+      mue = 2.0d0/(1.0d0+x)
+      mui = 1.0/(1.0/mu-1.0/mue)
+c 1 keV plasma; 0.1 particle /cc
+      T = TkeV*1.1604e7
+      d = mue*n_e*mp/mui
+      p = d*boltz*T/(mu*mp)
+      if (xcosmic) pcr = pcrbyp*p
+      iseed = 1
+      v1=0.0d0;v2=0.0d0;v3=0.0d0
+      if (xmhd) then
+        b1=1.0e-6;b2=1.0e-6;b3=0.0
+      endif
+c      do i = 1, in
+c        if (i.gt.in/2) then
+c          b2(i,:,:) = 1.0e-6
+c        else
+c          b2(i,:,:) =-1.0e-6
+c        endif 
+c      enddo
+c producing power law fluctuations on density
+c      do nk = 4, 16
+c        wn = 2.0*pi*nk/1.2344e+23
+c        call ran2(iseed,rvalue)
+c        theta = pi*rvalue
+cc        theta = 0.0
+c        call ran2(iseed,rvalue)
+c        rphase = rvalue*2.0*pi
+c      do k = 1, kn
+c      do j = 1, jn
+c      do i = 1, in
+cc
+cc producing a turbulent PS for density
+cc
+cc        d(i,j,k) = d(i,j,k)*(1.0 + 0.01*sin(8.0*pi*x1b(i)/6.172e22)) 
+c         d(i,j,k) = d(i,j,k)*(1.0
+c     &   + 0.0001*nk**-2.0*sin(wn*cos(theta)*x1b(i)
+c     &   + wn*sin(theta)*x2b(j)+rphase))
+cc         if (x1b(i).lt.1.2344e23*0.5) then 
+cc           v1(i,j,k) = 5.0e7
+cc         else
+cc           v1(i,j,k) = -5.0e7
+cc         endif 
+cc         v1(i,j,k) = 1.0e5*sin(6.0*pi*x1b(i)/1.2344e23) 
+cc         d(i,j,k) = d(i,j,k)*( 1.0 + 0.05*exp(-((x1b(i)-1.2344e+23/2.)
+cc     &   /1.2344e23)**2) )
+c      enddo
+c      enddo
+c      enddo
+c      enddo
+c
+c      d = d - 0.04e-25
+c producing normally-distributed density fluctuations
+c      do k = 1, kn
+c      do j = 1, jn
+c      do i = 1, in
+      
+c        call ran2(iseed,rvalue)
+c        rvalue = randgs(0.0, 1.0)
+c        d(i,j,k) = d(i,j,k)*(1.0 + amp*rvalue) 
+c      enddo 
+c      enddo
+c      enddo
+      write(inifile,"(a3,3i2.2)") 'bni',coords(1)
+     &                                      ,coords(2),coords(3)
+      open(unit=261,file=inifile,status='old',form='unformatted')
+c only 2d for now
+c      do j = js, je
+c      do i = is, ie
+c        read(261,"(1e20.7)") drho
+c i know the rough magnitude of drho
+c        d(i,j,k) = d(i,j,k)*( 1.0 + amp*1.e1*drho)
+c      enddo 
+c      enddo
+      read(261) drho(is:ie,js:je,ks:ke)
+      close(261)
+      do k = ks, ke
+      do j = js, je
+      do i = is, ie
+        d(i,j,k) = d(i,j,k)*( 1.0 + amp*1.e2*drho(i,j,k))
+      enddo
+      enddo
+      enddo
+      e = p/gamm1
+      if (xcosmic) ecr = pcr/gamm1_cr
+c
+      return
+      end
+      function randgs (xmean, sd)
+c
+c generate a normally distributed random number, i.e., generate random
+c numbers with a gaussian distribution.  these random numbers are not
+c exceptionally good -- especially in the tails of the distribution,
+c but this implementation is simple and suitable for most applications.
+c see r. w. hamming, numerical methods for scientists and engineers,
+c mcgraw-hill, 1962, pages 34 and 389.
+c
+c             input arguments --
+c xmean  the mean of the gaussian distribution.
+c sd     the standard deviation of the gaussian function
+c          exp (-1/2 * (x-xmean)**2 / sd**2)
+c
+      external rand
+c
+      randgs = -6.
+      do 10 i=1,12
+        randgs = randgs + rand(0.)
+ 10   continue
+c
+      randgs = xmean + sd*randgs
+c
+      return
+      end
