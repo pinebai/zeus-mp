@@ -17,19 +17,20 @@
 #
 #-------------------  macro definitions  -------------------------------
 #
-all: compile
+all: directories compile
 ZMP_EXE   = ../exe90/
 ZMP_MOD   = ./
-ZMP_FC    = gfortran
+ZMP_FC    = gfortran -ffixed-line-length-0
+MKDIR_P = mkdir -p
 #-----------------------------------------------------------------------
 # Uncomment the next line to compile with agressive optimization
 #ZMP_OPTS  = -c -O3
 ZMP_OPTS  = -c -g
 #-----------------------------------------------------------------------
 ZMP_CC    = gcc
-ZMP_LDR   = gfortran
+ZMP_LDR   = gfortran -ffixed-line-length-0
 #-----------------------------------------------------------------------
-ZMP_CPP   = cpp -DPROBLEM=kh -DPROBRES=empty
+ZMP_CPP   = cpp -DPROBLEM=blast2d -DPROBRES=empty
 #--------------------  implicit rules  ---------------------------------
 #
 .SUFFIXES: .F .for .c .o
@@ -48,7 +49,7 @@ ZMP_CPP   = cpp -DPROBLEM=kh -DPROBRES=empty
 #
 #-------------------  Fortran object files  ----------------------------
 #
-FOBJ = mod_files.o advx1.o advx2.o advx3.o alloc_arrays.o avisc.o avisc_d.o binout.o bndyflgs.o bval3d.o bvalabuns.o bvalemf.o bvalt.o cgsolve.o crdiffuse.o crdiffuse_d.o crsource.o clocks.o configure.o cooling.o ct.o ct_1D.o ct_2D.o dataio.o difco1.o difco2.o difco3.o diverg.o dprd.o empty.o eos_d.o eos.o fftwgrav.o findno.o floors.o forces.o forces_d.o ggen.o gpbv.o gravity.o gravmg.o grav2dcg.o grav3dcg.o grdv.o hdfall.o hsmoc.o hsmoc_1D.o hsmoc_2D.o grey_fld.o intchk.o jacob.o lorentz.o lorentz_1D.o lorentz_2D.o lorentz_d.o mapin.o mapout.o matprop.o mnmx.o momx1.o momx2.o momx3.o msave.o msendrec.o mstart.o mul_sym.o offdiag.o newdt.o newgrid.o newvg.o newx1.o newx2.o newx3.o nudt.o opac_d.o opacity.o options.o output2D.o pdv.o pdv_d.o printd.o qupdate.o qupdate_d.o qupdate_iso.o qupdate_iso_d.o rad_imp_dt.o rad_solve.o radialplot.o restart.o sendrec.o setup.o srcstep.o strtoi.o sym_diag.o sym_prcn.o transprt.o transprt_1D.o transprt_2D.o tranx1.o tranx2.o tranx3.o updtmtrxbnd.o updtvecbnd.o zeusmp.o gcollapse.o textdmp.o  linpck.o sod.o blast.o sedov.o stream.o rshock.o mhdshktube.o rotor.o mhdvortex.o noh.o torus.o cluster.o bondi.o thermal.o kh.o 
+FOBJ = mod_files.o advx1.o advx2.o advx3.o alloc_arrays.o avisc.o avisc_d.o binout.o bndyflgs.o bval3d.o bvalabuns.o bvalemf.o bvalt.o cgsolve.o crdiffuse.o crdiffuse_d.o crsource.o clocks.o configure.o cooling.o ct.o ct_1D.o ct_2D.o dataio.o difco1.o difco2.o difco3.o diverg.o dprd.o empty.o eos_d.o eos.o fftwgrav.o findno.o floors.o forces.o forces_d.o ggen.o gpbv.o gravity.o gravmg.o grav2dcg.o grav3dcg.o grdv.o hdfall.o hsmoc.o hsmoc_1D.o hsmoc_2D.o grey_fld.o intchk.o jacob.o lorentz.o lorentz_1D.o lorentz_2D.o lorentz_d.o mapin.o mapout.o matprop.o mnmx.o momx1.o momx2.o momx3.o msave.o msendrec.o mstart.o mul_sym.o offdiag.o newdt.o newgrid.o newvg.o newx1.o newx2.o newx3.o nudt.o opac_d.o opacity.o options.o output2D.o pdv.o pdv_d.o printd.o qupdate.o qupdate_d.o qupdate_iso.o qupdate_iso_d.o rad_imp_dt.o rad_solve.o radialplot.o restart.o sendrec.o setup.o srcstep.o strtoi.o sym_diag.o sym_prcn.o transprt.o transprt_1D.o transprt_2D.o tranx1.o tranx2.o tranx3.o updtmtrxbnd.o updtvecbnd.o zeusmp.o gcollapse.o textdmp.o  linpck.o sod.o  sedov.o stream.o rshock.o mhdshktube.o rotor.o mhdvortex.o noh.o torus.o cluster.o bondi.o thermal.o blast2d.o 
 #
 #-------------------  C object files  ----------------------------------
 #
@@ -92,7 +93,11 @@ listing:
 #
 #-----------------------------------------------------------------------
 #
-compile: ${ZMP_EXE}zeusmp.x
+directories:${ZMP_EXE}
+${ZMP_EXE}:
+	${MKDIR_P} ${ZMP_EXE}
+
+compile:${ZMP_EXE}zeusmp.x
 
 ${ZMP_EXE}zeusmp.x: ${FOBJ} ${COBJ}
 	${ZMP_LDR} -o ${ZMP_EXE}zeusmp.x ${FOBJ} ${COBJ}
@@ -326,7 +331,7 @@ mhdvortex.o: mhdvortex.F mod_files.o
 
 mhdshktube.o: mhdshktube.F mod_files.o  
 
-blast.o: blast.F mod_files.o  
+blast2d.o: blast2d.F mod_files.o  
 
 gcollapse.o: gcollapse.F mod_files.o  
 
@@ -342,7 +347,7 @@ cluster.o: cluster.F mod_files.o
 
 thermal.o: thermal.F mod_files.o
 
-kh.o: kh.F mod_files.o
+blast.o: blast.F mod_files.o
 
 #shock_tube.o: shock_tube.F mod_files.o
 

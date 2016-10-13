@@ -64,7 +64,7 @@ c----------------------------------------------------------------------
 c     Open zmp_conf run configuration file
 c----------------------------------------------------------------------
 c
-      if(myid_w .eq. 0) open(unit=1,file='zmp_inp',status='old')
+      if(myid_w .eq. 0) open(unit=1,file='../src90/zmp_inp',status='old')
 c
 c----------------------------------------------------------------------
 c     Initialize all parameters to default values before continuing
