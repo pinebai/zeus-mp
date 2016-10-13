@@ -206,7 +206,7 @@ c cosmic ray energy density
         write(41,2001) (scal(l), l = 1, nscal) 
       enddo
       close(41)
-2001  format(22e20.7)
+2001  format(57e20.7E4)
 c
       return
       end

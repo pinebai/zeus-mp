@@ -82,7 +82,7 @@ c
       enddo
 
       close(42) 
-2001  format(13e20.7)
+2001  format(57e20.7E4)
 c
       return
       end
