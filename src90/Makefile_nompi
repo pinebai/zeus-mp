@@ -20,17 +20,17 @@
 all: directories compile
 ZMP_EXE   = ../exe90/
 ZMP_MOD   = ./
-ZMP_FC    = mpifort -ffixed-line-length-0
+ZMP_FC    = gfortran -ffixed-line-length-0
 MKDIR_P = mkdir -p
 #-----------------------------------------------------------------------
 # Uncomment the next line to compile with agressive optimization
 #ZMP_OPTS  = -c -O3
 ZMP_OPTS  = -c -g
 #-----------------------------------------------------------------------
-ZMP_CC    = mpicc
-ZMP_LDR   = mpifort -ffixed-line-length-0
+ZMP_CC    = gcc
+ZMP_LDR   = gfortran -ffixed-line-length-0
 #-----------------------------------------------------------------------
-ZMP_CPP   = cpp -DPROBLEM=blast2d -DPROBRES=empty -DMPI_USED -DMPI_FLOAT=MPI_DOUBLE_PRECISION -DMPI_2FLOAT=MPI_2DOUBLE_PRECISION
+ZMP_CPP   = cpp -DPROBLEM=blast2d -DPROBRES=empty
 #--------------------  implicit rules  ---------------------------------
 #
 .SUFFIXES: .F .for .c .o
